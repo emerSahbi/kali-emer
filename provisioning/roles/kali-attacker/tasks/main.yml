@@ -1,0 +1,187 @@
+---
+# Kali attacker workstation.
+#
+# Reproduces the expected service footprint of the box:
+#   TCP 22    sshd            -> openssh-server (present on base image, ensured here)
+#   TCP 5901  xvnc.socket     -> TigerVNC systemd socket (remote desktop)
+#   TCP 6001  Xvnc            -> X11 display :1 opened by the socket-activated Xvnc
+#   UDP 177   lightdm         -> XDMCP graphical login (VNC sessions query it locally)
+#   UDP 323   chronyd         -> time synchronisation
+#   UDP 68    dhcpcd          -> DHCPv4 client  (provided by the base image)
+#   UDP 546   dhcpcd          -> DHCPv6 client  (provided by the base image)
+#
+# NOTE: DHCP (dhcpcd, 68/546) is supplied by the cloud base image and manages the
+# lab interface. We deliberately do NOT install/enable a second DHCP client here
+# so we never disturb sandbox connectivity.
+
+- name: Create alias for the target
+  lineinfile:
+    path: /etc/hosts
+    line: '10.1.31.10 target'
+
+- name: Install desktop, remote-access and pentest packages
+  apt:
+    update_cache: yes
+    pkg:
+      - xfce4
+      - xfce4-terminal
+      - lightdm
+      - dbus-x11
+      - tigervnc-standalone-server
+      - tigervnc-common
+      - chrony
+      - openssh-server
+      - firefox-esr
+      - nmap
+      - hydra
+      - gobuster
+      - dirb
+      - netcat-traditional
+      - sshpass
+      - curl
+      - jq
+      - net-tools
+    state: present
+
+# --- Graphical login (lightdm) + XDMCP on UDP 177 ---------------------------
+
+- name: Make lightdm the default display manager
+  copy:
+    dest: /etc/X11/default-display-manager
+    content: "/usr/sbin/lightdm\n"
+    owner: root
+    mode: '0644'
+
+- name: Ensure lightdm config drop-in directory exists
+  file:
+    path: /etc/lightdm/lightdm.conf.d
+    state: directory
+    owner: root
+    mode: '0755'
+
+- name: Enable XDMCP server in lightdm (UDP 177)
+  copy:
+    dest: /etc/lightdm/lightdm.conf.d/50-xdmcp.conf
+    content: |
+      [LightDM]
+      [XDMCPServer]
+      enabled=true
+      port=177
+    owner: root
+    mode: '0644'
+  notify: restart lightdm
+
+- name: Boot to the graphical target so lightdm runs
+  command: systemctl set-default graphical.target
+  changed_when: false
+
+- name: Enable lightdm
+  service:
+    name: lightdm
+    enabled: yes
+    state: started
+
+# --- TigerVNC over systemd socket: xvnc.socket (5901) -> Xvnc (6001) --------
+
+- name: Override directory for xvnc.socket
+  file:
+    path: /etc/systemd/system/xvnc.socket.d
+    state: directory
+    owner: root
+    mode: '0755'
+
+- name: Bind the VNC systemd socket to TCP 5901
+  copy:
+    dest: /etc/systemd/system/xvnc.socket.d/override.conf
+    content: |
+      [Socket]
+      ListenStream=
+      ListenStream=5901
+    owner: root
+    mode: '0644'
+  notify: reload systemd
+
+- name: Override directory for xvnc@.service
+  file:
+    path: /etc/systemd/system/xvnc@.service.d
+    state: directory
+    owner: root
+    mode: '0755'
+
+- name: Socket-activated Xvnc presents the local lightdm login over VNC
+  copy:
+    dest: /etc/systemd/system/xvnc@.service.d/override.conf
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/Xvnc -inetd -query localhost -geometry 1280x800 -depth 24 -SecurityTypes None -once
+    owner: root
+    mode: '0644'
+  notify: reload systemd
+
+- name: Enable the VNC systemd socket
+  systemd:
+    name: xvnc.socket
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+# --- Time sync (chronyd, UDP 323) -------------------------------------------
+
+- name: Enable chrony time synchronisation
+  service:
+    name: chrony
+    enabled: yes
+    state: started
+
+# --- SSH (TCP 22) -----------------------------------------------------------
+
+- name: Ensure SSH is enabled and running
+  service:
+    name: ssh
+    enabled: yes
+    state: started
+
+# --- Operator quality-of-life -----------------------------------------------
+
+- name: Create Desktop directory for Sandy
+  file:
+    path: /home/Sandy/Desktop
+    state: directory
+    owner: Sandy
+    group: Sandy
+    mode: '0755'
+
+- name: Drop a red-team cheatsheet on the Desktop
+  copy:
+    dest: /home/Sandy/Desktop/RedTeam-Cheatsheet.txt
+    owner: Sandy
+    group: Sandy
+    mode: '0644'
+    content: |
+      ==================================================
+        RED TEAM / PENTEST WORKSTATION - QUICK REFERENCE
+      ==================================================
+
+      THIS BOX (Kali attacker)
+        IP:        10.1.30.5
+        Login:     Sandy / sandypass
+        Remote:    VNC  -> 10.1.30.5:5901   (presents the lightdm login)
+                   SSH  -> ssh Sandy@10.1.30.5
+
+      TARGET
+        IP:        10.1.31.10   (alias: target)
+
+      RECON
+        nmap -sV 10.1.31.10
+        gobuster dir -u http://10.1.31.10 -w /usr/share/wordlists/dirb/common.txt
+        curl http://10.1.31.10/robots.txt
+
+      ACCESS
+        ssh operator@10.1.31.10
+
+      PRIVILEGE ESCALATION
+        find / -perm -4000 2>/dev/null        # list SUID binaries
+        # SUID find -> GTFOBins:
+        find . -exec /bin/sh -p \; -quit
+        cat /root/flag.txt

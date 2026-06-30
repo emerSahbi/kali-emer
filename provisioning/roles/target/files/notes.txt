@@ -1,0 +1,13 @@
+Initech - migration notes (DO NOT COMMIT)
+-----------------------------------------
+
+Reminder for the migration window:
+
+  - The temporary service account is still active on this host.
+  - SSH login for hand-off:
+
+        user: operator
+        pass: P@ssw0rd2024
+
+  - Rotate this credential once the migration is signed off.
+  - operator can run a couple of maintenance binaries - clean that up too.

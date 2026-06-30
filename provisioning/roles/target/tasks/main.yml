@@ -1,0 +1,131 @@
+---
+# Target server: vulnerable host for the red-team / pentest chain.
+#
+# Attack path:
+#   1. nmap recon            -> 22/SSH + 80/HTTP open
+#   2. web enumeration       -> robots.txt leaks /backup/
+#   3. /backup/notes.txt     -> SSH creds for "operator"
+#   4. SSH login as operator
+#   5. SUID enumeration      -> /usr/bin/find is SUID root (misconfig)
+#   6. GTFOBins privesc      -> root shell -> /root/flag.txt
+
+- name: Create alias for the attacker
+  lineinfile:
+    path: /etc/hosts
+    line: '10.1.30.5 attacker'
+
+- name: Install web and SSH services
+  apt:
+    update_cache: yes
+    pkg:
+      - apache2
+      - openssh-server
+    state: present
+
+# --- Web content (recon + credential leak) ----------------------------------
+
+- name: Deploy landing page
+  copy:
+    src: index.html
+    dest: /var/www/html/index.html
+    owner: www-data
+    group: www-data
+    mode: '0644'
+
+- name: Deploy robots.txt (leaks the backup directory)
+  copy:
+    src: robots.txt
+    dest: /var/www/html/robots.txt
+    owner: www-data
+    group: www-data
+    mode: '0644'
+
+- name: Create the "hidden" backup directory
+  file:
+    path: /var/www/html/backup
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
+- name: Drop migration notes with leaked SSH credentials
+  copy:
+    src: notes.txt
+    dest: /var/www/html/backup/notes.txt
+    owner: www-data
+    group: www-data
+    mode: '0644'
+
+- name: Ensure Apache is enabled and running
+  service:
+    name: apache2
+    enabled: yes
+    state: started
+
+# --- Foothold account -------------------------------------------------------
+
+- name: Create the operator service account (weak, leaked password)
+  user:
+    name: operator
+    password: "{{ 'P@ssw0rd2024' | password_hash('sha512') }}"
+    shell: /bin/bash
+    groups: users
+    append: yes
+
+# --- Privilege escalation: SUID find (GTFOBins) -----------------------------
+
+- name: Misconfigure /usr/bin/find as SUID root (privesc vector)
+  file:
+    path: /usr/bin/find
+    mode: '4755'
+
+- name: Plant the root flag
+  copy:
+    dest: /root/flag.txt
+    content: "R3D-T34M-R00T\n"
+    owner: root
+    group: root
+    mode: '0644'
+
+# --- Make sure password SSH login actually works on the cloud image ---------
+
+- name: Remove ALL sshd drop-in configs
+  shell: rm -f /etc/ssh/sshd_config.d/*.conf
+
+- name: Comment out Include directive so no drop-in can override main config
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^\s*Include\s+'
+    line: '# Include /etc/ssh/sshd_config.d/*.conf'
+
+- name: Ensure PasswordAuthentication yes in main sshd_config
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?\s*PasswordAuthentication\s+'
+    line: 'PasswordAuthentication yes'
+
+- name: Ensure KbdInteractiveAuthentication yes in main sshd_config
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?\s*KbdInteractiveAuthentication\s+'
+    line: 'KbdInteractiveAuthentication yes'
+
+- name: Fully disable cloud-init SSH management
+  copy:
+    dest: /etc/cloud/cloud.cfg.d/99-disable-ssh.cfg
+    content: |
+      ssh_pwauth: true
+      ssh:
+        emit_keys_to_console: false
+    owner: root
+    mode: '0644'
+
+- name: Prevent cloud-init from running ssh module again
+  shell: rm -f /etc/ssh/sshd_config.d/*.conf
+
+- name: Force restart SSH
+  service:
+    name: ssh
+    state: restarted
+    enabled: yes
+...

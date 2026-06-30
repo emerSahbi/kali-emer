@@ -1,0 +1,36 @@
+---
+
+- name: disable qxl
+  hosts:
+    - routers
+    - hosts
+  gather_facts: yes
+  become: yes
+  tasks:
+    - include_role:
+        name: disable-qxl
+      when: ansible_os_family == 'Debian'
+
+- name: set up kali attacker workstation
+  hosts: kali
+  become: yes
+  roles:
+    - name: user-access
+      user_access_username: Sandy
+      user_access_password: sandypass
+      user_access_sudo: true
+    - name: kali-attacker
+
+- name: set up target server
+  hosts: target
+  become: yes
+  roles:
+    - name: target
+
+- name: set up command logging
+  hosts: hosts
+  become: yes
+  roles:
+    - role: sandbox-logging
+      slf_destination_port: '{% if hostvars["man"] is defined -%} 514 {%- else -%} 515 {%- endif %}'
+...
